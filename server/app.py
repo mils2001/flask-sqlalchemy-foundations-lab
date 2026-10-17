@@ -1,13 +1,12 @@
 
 #!/usr/bin/env python3
 
-from flask import Flask, make_response, request
+from flask import Flask, make_response
 from flask_migrate import Migrate
 
 from models import db, Earthquake
 
 app = Flask(__name__)
-
 app.config["SQLALCHEMY_DATABASE_URI"] = "sqlite:///app.db"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.json.compact = False
@@ -30,28 +29,39 @@ def earthquake_by_id(id):
             {"message": f"Earthquake {id} not found."}, 404
         )
 
-    response = {
+    return make_response({
         "id": earthquake.id,
         "magnitude": earthquake.magnitude,
         "location": earthquake.location,
         "year": earthquake.year,
-    }
-
-    return make_response(response, 200)
+    }, 200)
 
 
 @app.route("/earthquakes")
-def earthquakes_by_magnitude():
-    magnitude = request.args.get("magnitude", type=float)
+def earthquakes_index():
+    earthquakes = Earthquake.query.order_by(Earthquake.id).all()
+    quakes = [
+        {
+            "id": earthquake.id,
+            "magnitude": earthquake.magnitude,
+            "location": earthquake.location,
+            "year": earthquake.year,
+        }
+        for earthquake in earthquakes
+    ]
+    return make_response({"count": len(quakes), "quakes": quakes}, 200)
 
-    query = Earthquake.query
 
-    if magnitude is not None:
-        query = query.filter(Earthquake.magnitude >= magnitude)
+@app.route("/earthquakes/magnitude/<float:magnitude>")
+def earthquakes_by_magnitude(magnitude):
+    earthquakes = (
+        Earthquake.query
+        .filter(Earthquake.magnitude >= magnitude)
+        .order_by(Earthquake.id)
+        .all()
+    )
 
-    earthquakes = query.order_by(Earthquake.id).all()
-
-    response = [
+    quakes = [
         {
             "id": earthquake.id,
             "magnitude": earthquake.magnitude,
@@ -61,7 +71,10 @@ def earthquakes_by_magnitude():
         for earthquake in earthquakes
     ]
 
-    return make_response(response, 200)
+    return make_response({
+        "count": len(quakes),
+        "quakes": quakes,
+    }, 200)
 
 
 if __name__ == "__main__":
